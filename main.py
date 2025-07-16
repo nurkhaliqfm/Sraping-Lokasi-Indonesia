@@ -31,16 +31,22 @@ try:
     driver.get(URL)
 
     try:
-        isCloudFlareIsPass = WebDriverWait(driver, 2).until(
+        isCloudFlareIsPass = WebDriverWait(driver, 5).until(
             EC.presence_of_element_located((By.XPATH, "//form[@name='pilihnya']"))
         )
 
-        driver.save_screenshot(f"data/screenshoot/success-{CURRENT_TIME}.png")
-        print(f"Successfully passed Cloudflare! {isCloudFlareIsPass}")
+        # driver.save_screenshot(f"data/screenshoot/success-{CURRENT_TIME}.png")
+
+        eTable = driver.find_element(
+            By.XPATH,
+            "//table[@class='header_mentok']",
+        ).get_attribute("innerHTML")
+
+        print(eTable)
 
     except:
-        driver.save_screenshot(f"data/screenshoot/failed{CURRENT_TIME}.png")
-        print("Failed Pass Cloudflare")
+        # driver.save_screenshot(f"data/screenshoot/failed{CURRENT_TIME}.png")
+        print("Failed to scrap")
 
 
 finally:
