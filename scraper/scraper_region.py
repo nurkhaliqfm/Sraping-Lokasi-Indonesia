@@ -4,7 +4,6 @@ import os
 from utils.driver import get_chrome_options
 from pathlib import Path
 from datetime import datetime
-from utils.save_json import save_json
 from bs4 import BeautifulSoup
 from selenium import webdriver
 from selenium.webdriver.common.by import By
@@ -13,6 +12,7 @@ from selenium.webdriver.support import expected_conditions as EC
 from selenium.webdriver.chrome.service import Service as ChromeService
 from webdriver_manager.chrome import ChromeDriverManager
 from typing import List, Dict
+from typing import Optional, List, Dict
 
 SCREENSHOT_DIR = Path(os.getenv("SCREENSHOT_DIR", "data/screenshoot"))
 SCREENSHOT_DIR.mkdir(parents=True, exist_ok=True)
@@ -42,13 +42,16 @@ def scraper_region(
     selected_rule: str,
     rule: Dict[str, int],
     timeout: int = 5,
+    locations: Optional[List[Dict[str, str]]] = None,
 ) -> List[Dict[str, str]]:
 
     if not rule:
         raise ValueError("⚠️ 'rule' dictionary is empty or invalid.")
 
+    if locations is None:
+        locations = []
+
     driver = None
-    locations: List[Dict[str, str]] = []
 
     try:
         driver = create_driver()
@@ -74,7 +77,7 @@ def scraper_region(
 
         if locations:
             locations.pop()
-        save_json(locations, selected_rule)
+
         return locations
 
     except Exception as e:
