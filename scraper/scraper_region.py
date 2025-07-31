@@ -39,7 +39,8 @@ def parse_row(html: str, rule: Dict[str, int]) -> Dict[str, str]:
 
 def scraper_region(
     url: str,
-    selected_rule: str,
+    level: str,
+    name: str,
     rule: Dict[str, int],
     timeout: int = 5,
     locations: Optional[List[Dict[str, str]]] = None,
@@ -75,14 +76,14 @@ def scraper_region(
             )
             locations.append(item_location)
 
-        if locations:
+        if locations and level == "provinsi":
             locations.pop()
 
         return locations
 
     except Exception as e:
         timestamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-        screenshot_path = SCREENSHOT_DIR / f"failed-log-{selected_rule}-{timestamp}.png"
+        screenshot_path = SCREENSHOT_DIR / f"failed-log-{name}-{timestamp}.png"
 
         if driver:
             try:
@@ -90,7 +91,7 @@ def scraper_region(
             except Exception as ss_err:
                 logger.warning(f"⚠️ Could not save screenshot: {ss_err}")
 
-        logger.error(f"❌ Scraping failed for rule '{selected_rule}' at {url}: {e}")
+        logger.error(f"❌ Scraping failed for rule '{name}' at {url}: {e}")
         traceback.print_exc()
 
         return []
@@ -98,6 +99,4 @@ def scraper_region(
     finally:
         if driver:
             driver.quit()
-            logger.info(
-                f"✅ Successfully scraped {len(locations)} rows for '{selected_rule}'"
-            )
+            logger.info(f"✅ Successfully scraped {len(locations)} rows for '{name}'")
