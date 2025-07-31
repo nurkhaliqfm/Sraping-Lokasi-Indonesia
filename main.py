@@ -31,7 +31,11 @@ def run_provinsi():
     url = f"{URL_BASE}?_i=provinsi-kodepos&perhal=60&urut=&asc=000011111&sby=000000&daerah=&jobs="
     locations = []
     scraped_data = scraper_region(
-        url, "provinsi", RULE_LOKASI["provinsi"], locations=locations
+        url=url,
+        level="provinsi",
+        name="provinsi",
+        rule=RULE_LOKASI["provinsi"],
+        locations=locations,
     )
 
     ref_provinsi = [
@@ -64,7 +68,11 @@ def run_kabupaten():
         location = prov["nama"]
         url = f"{URL_BASE}?_i=kota-kodepos&sby=000000&daerah=Provinsi&jobs={location}"
         scraper_region(
-            url, f"kabupaten_{location}", RULE_LOKASI["kabupaten"], locations=locations
+            url=url,
+            level="kecamatan",
+            name=f"kabupaten_{location}",
+            rule=RULE_LOKASI["kabupaten"],
+            locations=locations,
         )
 
         scraped_data.extend(
@@ -75,7 +83,9 @@ def run_kabupaten():
         {
             "id": i + 1,
             "nama": f"{item['Type']} {item['Nama']}",
+            "slug": item["Nama"],
             "kode": item["Kode"],
+            "type": item["Type"],
             "ref_provinsi_id": item["ref_provinsi_id"],
             "createdAt": CURRENT_TIMESTAMP,
             "updatedAt": CURRENT_TIMESTAMP,
@@ -87,43 +97,104 @@ def run_kabupaten():
 
 
 def run_kecamatan():
-    kabupaten_files = Path("data/lokasi").glob("kabupaten_*.json")
-    rule = RULE_LOKASI["kecamatan"]
+    kabupaten_path = DATA_DIR / "ref_kabupaten.json"
+    kabupaten_list = load_json(kabupaten_path)
 
-    if not list(kabupaten_files):
+    if not kabupaten_list:
         print("❌ Missing kabupaten data. Please run Kabupaten scraping first.")
         return
 
-    print(list(kabupaten_files))
+    print("📍 Scraping Kecamatan for each Kabupaten...")
 
-    for kab_file in kabupaten_files:
-        try:
-            with open(kab_file, "r", encoding="utf-8") as f:
-                data = json.load(f)
+    scraped_data = []
+    for kab in kabupaten_list:
+        locations = []
+        location = kab["slug"]
+        type = kab["type"]
+        url = (
+            f"{URL_BASE}?_i=kecamatan-kodepos&sby=000000&daerah={type}&jobs={location}"
+        )
+        scraper_region(
+            url,
+            level="kecamatan",
+            name=f"kecamatan_{location}",
+            rule=RULE_LOKASI["kecamatan"],
+            locations=locations,
+        )
 
-            for item in data:
-                location = item.get("Nama")
-                daerah = item.get("Kode")
+        scraped_data.extend(
+            [{**item, "ref_kabupaten_kota_id": kab["id"]} for item in locations]
+        )
 
-                if not daerah or not location:
-                    print(f"⚠️ Skipping invalid item in {kab_file.name}")
-                    continue
+    ref_kecamatan = [
+        {
+            "id": i + 1,
+            "nama": item["Nama"],
+            "kode": item["Kode"],
+            "ref_kabupaten_kota_id": item["ref_kabupaten_kota_id"],
+            "createdAt": CURRENT_TIMESTAMP,
+            "updatedAt": CURRENT_TIMESTAMP,
+        }
+        for i, item in enumerate(scraped_data)
+    ]
 
-                url = f"{URL_BASE}?_i=kecamatan-kodepos&sby=000000&daerah={daerah}&jobs={location}"
-                print(f"📍 Scraping Kecamatan for Kabupaten: {location} ({daerah})")
-                scraper_region(url, f"kecamatan_{location}", rule)
-
-        except Exception as e:
-            print(f"❌ Failed to process {kab_file.name}: {e}")
+    save_json(ref_kecamatan, "ref_kecamatan")
 
 
 def run_desa():
-    location = "Nama"
-    daerah = "Type"
-    kabupaten = "Kabupaten"
+    kabupaten_path = DATA_DIR / "ref_kabupaten.json"
+    kabupaten_list = load_json(kabupaten_path)
+    ref_kabupaten_kota_id = {kab["id"]: kab for kab in kabupaten_list}
 
-    print("🧭 Scraping Desa...")
-    url = f"{URL_BASE}?_i=desa-kodepos&sby=000000&daerah=Kecamatan-{daerah}-{kabupaten}&jobs={location}"
+    kecamatan_path = DATA_DIR / "ref_kecamatan.json"
+    kecamatan_list = load_json(kecamatan_path)
+
+    if not kecamatan_list:
+        print("❌ Missing kecamatan data. Please run Kecamatan scraping first.")
+        return
+
+    print("📍 Scraping Desa for each Kecamatan...")
+
+    scraped_data = []
+    for kec in kecamatan_list:
+        locations = []
+        location = kec["nama"]
+
+        kab = ref_kabupaten_kota_id.get(kec["ref_kabupaten_kota_id"])
+        if kab is None:
+            print(
+                f"❌ Missing kabupaten data with id {kec['ref_kabupaten_kota_id']} in kecamatan {kec['nama']}. Please re-run Kecamatan scraping again."
+            )
+            break
+
+        url = f"{URL_BASE}?_i=desa-kodepos&sby=000000&daerah=Kecamatan-{kab['type']}-{kab['slug']}&jobs={location}"
+
+        scraper_region(
+            url,
+            level="kecamatan",
+            name=f"kecamatan_{location}",
+            rule=RULE_LOKASI["kecamatan"],
+            locations=locations,
+        )
+
+        scraped_data.extend(
+            [{**item, "ref_kecamatan_id": kab["id"]} for item in locations]
+        )
+
+    ref_desa_kelurahan = [
+        {
+            "id": i + 1,
+            "nama": item["Nama"],
+            "kode": item["Kode"],
+            "pos": item["Pos"],
+            "ref_kecamatan_id": item["ref_kecamatan_id"],
+            "createdAt": CURRENT_TIMESTAMP,
+            "updatedAt": CURRENT_TIMESTAMP,
+        }
+        for i, item in enumerate(scraped_data)
+    ]
+
+    save_json(ref_desa_kelurahan, "ref_desa_kelurahan")
 
 
 def main():
@@ -131,13 +202,13 @@ def main():
         "1": ("provinsi", run_provinsi),
         "2": ("kabupaten", run_kabupaten),
         "3": ("kecamatan", run_kecamatan),
-        # Extend with kecamatan/desa later
+        "4": ("kecamatan", run_desa),
     }
 
     while True:
         print("\n📦 What do you want to scrape?")
-        print("1. Provinsi\n2. Kabupaten\n3. Kecamatan\n0. Exit")
-        choice = input("Enter number (0–3): ").strip()
+        print("1. Provinsi\n2. Kabupaten\n3. Kecamatan\n4. Desa\n0. Exit")
+        choice = input("Enter number (0–4): ").strip()
 
         if choice == "0":
             print("👋 Exiting.")
