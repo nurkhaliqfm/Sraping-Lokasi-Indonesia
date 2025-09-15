@@ -202,7 +202,7 @@ def main():
         "1": ("provinsi", run_provinsi),
         "2": ("kabupaten", run_kabupaten),
         "3": ("kecamatan", run_kecamatan),
-        "4": ("kecamatan", run_desa),
+        "4": ("desa", run_desa),
     }
 
     while True:
